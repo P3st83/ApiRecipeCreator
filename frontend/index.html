@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Creator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>What Can I Cook Tonight?</h1>
+    <div class="form-container">
+        <form id="generate-form">
+            <label for="dietary-restrictions">Dietary Restrictions:</label>
+            <input type="text" id="dietary-restrictions" placeholder="e.g., vegan, gluten free">
+
+            <label for="excluded-ingredients">Excluded Ingredients:</label>
+            <input type="text" id="excluded-ingredients" placeholder="e.g., nuts, cheese">
+
+            <label for="included-ingredients">What do you have in the fridge/cupboard?</label>
+            <input type="text" id="included-ingredients" placeholder="e.g., tomato, basil, cucumber">
+
+            <label for="calorie-limit">Calorie Limit:</label>
+            <input type="number" id="calorie-limit" placeholder="e.g., 500">
+
+            <label for="cuisine">Cuisine:</label>
+            <input type="text" id="cuisine" placeholder="e.g., Italian">
+
+            <button type="submit">Generate Recipe</button>
+        </form>
+    </div>
+
+    <div id="results" class="container mt-4"></div>
+</body>
+</html>
