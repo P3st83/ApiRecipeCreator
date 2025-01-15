@@ -1,38 +1,101 @@
-
-import os
-import requests
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
+from typing import Optional
+import requests
+import logging
 
-load_dotenv()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
-API_KEY = os.getenv("SPOONACULAR_API_KEY")
-BASE_URL = "https://api.spoonacular.com"
-
+# Initialize FastAPI app
 app = FastAPI()
 
-class RecipeRequest(BaseModel):
-    ingredients: str
-    diet: str = None
-    excludeIngredients: str = None
-    cuisine: str = None
-    maxCalories: int = None
+# Add CORS middleware to allow frontend requests
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow requests from any origin
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
-@app.post("/generate_recipe/")
-async def generate_recipe(request: RecipeRequest):
-    params = {
-        "apiKey": API_KEY,
-        "includeIngredients": request.ingredients,
-        "diet": request.diet,
-        "excludeIngredients": request.excludeIngredients,
+# Spoonacular API Key
+SPOONACULAR_API_KEY = "970299eae4a743f292b830a36384b542"
+
+# Request body schema
+class RecipeRequest(BaseModel):
+    dietary_restrictions: Optional[str] = None
+    excluded_ingredients: Optional[str] = None
+    included_ingredients: Optional[str] = None
+    calorie_limit: Optional[int] = None
+    cuisine: Optional[str] = None
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Recipe Creator API!"}
+
+# Endpoint for generating recipes
+@app.post("/generate_recipes/")
+async def generate_recipes(request: RecipeRequest):
+    # Handle "no restriction" input
+    diet = None if request.dietary_restrictions and request.dietary_restrictions.lower() == "no restriction" else request.dietary_restrictions
+
+    # Build query parameters
+    query_params = {
+        "apiKey": SPOONACULAR_API_KEY,
+        "diet": diet,
+        "excludeIngredients": request.excluded_ingredients,
+        "includeIngredients": request.included_ingredients.replace(" ", "") if request.included_ingredients else None,
         "cuisine": request.cuisine,
-        "maxCalories": request.maxCalories,
-        "number": 5  # Number of recipes to fetch
+        "maxCalories": request.calorie_limit,
+        "number": 3,  # Fetch three recipes
+        "random": True,  # Randomize the results
     }
 
-    response = requests.get(f"{BASE_URL}/recipes/complexSearch", params=params)
-    if response.status_code != 200:
-        raise HTTPException(status_code=response.status_code, detail=response.json().get("message", "Error fetching recipes"))
+    # Remove empty parameters
+    query_params = {k: v for k, v in query_params.items() if v}
 
-    return response.json()
+    # Log incoming request and query parameters
+    logging.info(f"Incoming Request: {request.model_dump()}")
+    logging.info(f"Query Parameters Sent to Spoonacular: {query_params}")
+
+    try:
+        # Step 1: Call Spoonacular API to search recipes
+        response = requests.get("https://api.spoonacular.com/recipes/complexSearch", params=query_params)
+        response.raise_for_status()
+        data = response.json()
+
+        # Log Spoonacular's response
+        logging.info(f"Spoonacular Response: {data}")
+
+        if not data.get("results"):
+            return {
+                "message": (
+                    "No recipes found matching the criteria. "
+                    "Try broadening your inputs (e.g., fewer restrictions or ingredients)."
+                )
+            }
+
+        # Step 2: Fetch detailed information for each recipe
+        recipes = []
+        for recipe in data["results"]:
+            recipe_details_url = f"https://api.spoonacular.com/recipes/{recipe['id']}/information"
+            details_response = requests.get(recipe_details_url, params={"apiKey": SPOONACULAR_API_KEY})
+            details_response.raise_for_status()
+            details_data = details_response.json()
+
+            recipes.append({
+                "id": recipe["id"],
+                "title": recipe["title"],
+                "image": recipe["image"],
+                "sourceUrl": details_data.get("sourceUrl", "Link unavailable"),
+            })
+
+        return {"recipes": recipes}
+
+    except requests.exceptions.RequestException as e:
+        # Log the error
+        logging.error(f"Error communicating with Spoonacular API: {e}")
+        raise HTTPException(status_code=500, detail="Error communicating with Spoonacular API. Please try again later.")
