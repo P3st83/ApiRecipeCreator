@@ -39,8 +39,8 @@ document.getElementById("generate-form").addEventListener("submit", async (event
     }
 
     try {
-        // Send POST request to the backend
-        const response = await fetch("http://127.0.0.1:8000/generate_recipes/", {
+        // Send POST request to the backend (Replace with Render URL)
+        const response = await fetch("https://apirecipecreator.onrender.com/generate_recipes/", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
